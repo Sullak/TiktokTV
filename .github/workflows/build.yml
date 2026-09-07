@@ -61,6 +61,7 @@ jobs:
           cp app/build/outputs/apk/debug/app-debug.apk ./TikTokTV-debug.apk
           git add TikTokTV-debug.apk
           git commit -m "ci: apk compilado" || true
-          git push
+          git pull --rebase origin main
+          git push origin HEAD:main
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
