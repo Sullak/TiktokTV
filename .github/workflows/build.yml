@@ -51,15 +51,34 @@ jobs:
           name: TikTokTV-debug-apk
           path: app/build/outputs/apk/debug/app-debug.apk
 
-      - name: Commit APK into repo
+      - name: Upload APK into repo via API
         if: steps.build.outcome == 'success'
         run: |
-          git config user.name "ci-bot"
-          git config user.email "ci-bot@users.noreply.github.com"
-          cp app/build/outputs/apk/debug/app-debug.apk ./TikTokTV-debug.apk
-          git add TikTokTV-debug.apk
-          git commit -m "ci: apk compilado" || true
-          git pull --rebase origin main
-          git push origin HEAD:main
+          APK_PATH=app/build/outputs/apk/debug/app-debug.apk
+          base64 -w0 "$APK_PATH" > /tmp/content_b64.txt
+
+          curl -s -H "Authorization: Bearer $GITHUB_TOKEN" -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${{ github.repository }}/contents/TikTokTV-debug.apk" \
+            | python3 -c "
+import json, sys
+try:
+    d = json.load(sys.stdin)
+    print(d.get('sha',''))
+except Exception:
+    print('')
+" > /tmp/sha.txt
+
+          python3 -c "
+import json
+payload = {'message': 'ci: apk compilado', 'content': open('/tmp/content_b64.txt').read().strip()}
+sha = open('/tmp/sha.txt').read().strip()
+if sha:
+    payload['sha'] = sha
+with open('/tmp/payload.json', 'w') as f:
+    json.dump(payload, f)
+"
+          curl -s -X PUT -H "Authorization: Bearer $GITHUB_TOKEN" -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${{ github.repository }}/contents/TikTokTV-debug.apk" \
+            -d @/tmp/payload.json
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
