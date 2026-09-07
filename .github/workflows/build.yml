@@ -1,9 +1,12 @@
 name: Build APK
 
 on:
-  workflow_dispatch:   # permite lanzarlo manualmente desde el botón "Run workflow"
+  workflow_dispatch:
   push:
     branches: [ main ]
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -22,9 +25,27 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
 
       - name: Build debug APK
-        run: gradle assembleDebug
+        id: build
+        continue-on-error: true
+        run: gradle assembleDebug --stacktrace --info > build_log.txt 2>&1
+
+      - name: Commit log if build failed
+        if: steps.build.outcome == 'failure'
+        run: |
+          git config user.name "ci-bot"
+          git config user.email "ci-bot@users.noreply.github.com"
+          git add build_log.txt
+          git commit -m "ci: build log (failure)" || true
+          git push
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Fail job if build failed
+        if: steps.build.outcome == 'failure'
+        run: exit 1
 
       - name: Upload APK
+        if: steps.build.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
           name: TikTokTV-debug-apk
