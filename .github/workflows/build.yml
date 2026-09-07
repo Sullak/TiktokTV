@@ -2,8 +2,6 @@ name: Build APK
 
 on:
   workflow_dispatch:
-  push:
-    branches: [ main ]
 
 permissions:
   contents: write
@@ -58,29 +56,8 @@ jobs:
         run: |
           APK_PATH=app/build/outputs/apk/debug/app-debug.apk
           base64 -w0 "$APK_PATH" > /tmp/content_b64.txt
-
-          curl -s -H "Authorization: Bearer $GITHUB_TOKEN" -H "Accept: application/vnd.github+json" \
-            "https://api.github.com/repos/${{ github.repository }}/contents/TikTokTV-debug.apk" \
-            | python3 -c "
-import json, sys
-try:
-    d = json.load(sys.stdin)
-    print(d.get('sha',''))
-except Exception:
-    print('')
-" > /tmp/sha.txt
-
-          python3 -c "
-import json
-payload = {'message': 'ci: apk compilado', 'content': open('/tmp/content_b64.txt').read().strip()}
-sha = open('/tmp/sha.txt').read().strip()
-if sha:
-    payload['sha'] = sha
-with open('/tmp/payload.json', 'w') as f:
-    json.dump(payload, f)
-"
-          curl -s -X PUT -H "Authorization: Bearer $GITHUB_TOKEN" -H "Accept: application/vnd.github+json" \
-            "https://api.github.com/repos/${{ github.repository }}/contents/TikTokTV-debug.apk" \
-            -d @/tmp/payload.json
+          curl -s -H "Authorization: Bearer $GITHUB_TOKEN" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/${{ github.repository }}/contents/TikTokTV-debug.apk" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('sha','')) if isinstance(d, dict) else print('')" > /tmp/sha.txt || echo "" > /tmp/sha.txt
+          python3 -c "import json; c=open('/tmp/content_b64.txt').read().strip(); s=open('/tmp/sha.txt').read().strip(); p={'message':'ci: apk compilado','content':c}; p.update({'sha':s} if s else {}); open('/tmp/payload.json','w').write(json.dumps(p))"
+          curl -s -X PUT -H "Authorization: Bearer $GITHUB_TOKEN" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/${{ github.repository }}/contents/TikTokTV-debug.apk" -d @/tmp/payload.json
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
